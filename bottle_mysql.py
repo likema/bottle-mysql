@@ -52,14 +52,15 @@ class MySQLPlugin(object):
 
     name = 'mysql'
 
-    def __init__(self, dbuser=None, dbpass=None, dbname=None, dbhost='localhost', autocommit=True, dictrows=True, keyword='db'):
-         self.dbhost = dbhost
-         self.dbuser = dbuser
-         self.dbpass = dbpass
-         self.dbname = dbname
-         self.autocommit = autocommit
-         self.dictrows = dictrows
-         self.keyword = keyword
+    def __init__(self, dbuser=None, dbpass=None, dbname=None, dbhost='localhost', autocommit=True, dictrows=True, keyword='db', charset='utf8'):
+        self.dbhost = dbhost
+        self.dbuser = dbuser
+        self.dbpass = dbpass
+        self.dbname = dbname
+        self.autocommit = autocommit
+        self.dictrows = dictrows
+        self.keyword = keyword
+        self.charset = charset
 
     def setup(self, app):
         '''
@@ -81,6 +82,7 @@ class MySQLPlugin(object):
         autocommit = conf.get('autocommit', self.autocommit)
         dictrows = conf.get('dictrows', self.dictrows)
         keyword = conf.get('keyword', self.keyword)
+        charset = conf.get('charset', self.charset)
 
         # Test if the original callback accepts a 'db' keyword.
         # Ignore it if it does not need a database handle.
@@ -94,9 +96,9 @@ class MySQLPlugin(object):
             try:
                 # Using DictCursor lets us return result as a dictionary instead of the default list
                 if dictrows:
-                    con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname, cursorclass=cursors.DictCursor);
+                    con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname, cursorclass=cursors.DictCursor, charset=charset);
                 else:
-                    con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname);
+                    con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname, charset=charset);
                 cur = con.cursor()
             except HTTPResponse, e:
                 raise HTTPError(500, "Database Error", e)
