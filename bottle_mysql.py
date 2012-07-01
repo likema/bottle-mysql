@@ -52,8 +52,9 @@ class MySQLPlugin(object):
 
     name = 'mysql'
 
-    def __init__(self, dbuser=None, dbpass=None, dbname=None, dbhost='localhost', autocommit=True, dictrows=True, keyword='db', charset='utf8'):
+    def __init__(self, dbuser=None, dbpass=None, dbname=None, dbhost='localhost', dbport=3306, autocommit=True, dictrows=True, keyword='db', charset='utf8'):
         self.dbhost = dbhost
+        self.dbport = dbport
         self.dbuser = dbuser
         self.dbpass = dbpass
         self.dbname = dbname
@@ -76,6 +77,7 @@ class MySQLPlugin(object):
         # Override global configuration with route-specific values.
         conf = context['config'].get('mysql') or {}
         dbhost = conf.get('dbhost', self.dbhost)
+        dbport = conf.get('dbport', self.dbport)
         dbuser = conf.get('dbuser', self.dbuser)
         dbpass = conf.get('dbpass', self.dbpass)
         dbname = conf.get('dbname', self.dbname)
@@ -96,9 +98,9 @@ class MySQLPlugin(object):
             try:
                 # Using DictCursor lets us return result as a dictionary instead of the default list
                 if dictrows:
-                    con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname, cursorclass=cursors.DictCursor, charset=charset);
+                    con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname, cursorclass=cursors.DictCursor, charset=charset, port=dbport);
                 else:
-                    con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname, charset=charset);
+                    con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname, charset=charset, port=dbport);
                 cur = con.cursor()
             except HTTPResponse, e:
                 raise HTTPError(500, "Database Error", e)
