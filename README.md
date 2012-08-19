@@ -5,8 +5,8 @@ Bottle-MySQL
 MySQL is the world's most used relational database management system (RDBMS) that runs
 as a server providing multi-user access to a number of databases.
 
-This plugin simplifies the use of mysql databases in your Bottle applications. 
-Once installed, all you have to do is to add an ``db`` keyword argument 
+This plugin simplifies the use of mysql databases in your Bottle applications.
+Once installed, all you have to do is to add an ``db`` keyword argument
 (configurable) to route callbacks that need a database connection.
 
 Installation
@@ -25,25 +25,27 @@ or download the latest version from github:
 Usage
 ===============
 
-Once installed to an application, the plugin passes an open 
-:class:`MySQLdb.connect().cursor()` instance to all routes that requires an ``db`` keyword 
+Once installed to an application, the plugin passes an open
+:class:`MySQLdb.connect().cursor()` instance to all routes that requires an ``db`` keyword
 argument:
 
-    import bottle
-    import bottle_mysql
+```python
+import bottle
+import bottle_mysql
 
-    app = bottle.Bottle()
-    # dbhost is optional, default is localhost
-    plugin = bottle_mysql.Plugin(dbuser='user', dbpass='pass', dbname='some_db')
-    app.install(plugin)
+app = bottle.Bottle()
+# dbhost is optional, default is localhost
+plugin = bottle_mysql.Plugin(dbuser='user', dbpass='pass', dbname='some_db')
+app.install(plugin)
 
-    @app.route('/show/<item>')
-    def show(item, db):
-        db.execute('SELECT * from items where name="%s"', (item,))
-        row = db.fetchone()
-        if row:
-            return template('showitem', page=row)
-        return HTTPError(404, "Page not found")
+@app.route('/show/<item>')
+def show(item, db):
+	db.execute('SELECT * from items where name="%s"', (item,))
+	row = db.fetchone()
+	if row:
+		return template('showitem', page=row)
+	return HTTPError(404, "Page not found")
+```
 
 Routes that do not expect an ``db`` keyword argument are not affected.
 
@@ -61,29 +63,37 @@ The following configuration options exist for the plugin class:
 * **dbuser**: Username that will be used to connect to the database (default: None).
 * **dbpass**: Password that will be used to connect to the database (default: None).
 * **dbname**: Database name that will be connected to (default: None).
-* **dbhost**: Databse server host (default: 'localhost').
+* **dbhost**: Database server host (default: 'localhost').
+* **dbport**: Database server port (default: 3306).
 * **keyword**: The keyword argument name that triggers the plugin (default: 'db').
 * **autocommit**: Whether or not to commit outstanding transactions at the end of the request cycle (default: True).
 * **dictrows**: Whether or not to support dict-like access to row objects (default: True).
+* **charset**: Database connection charset (default: 'utf8')
+* **timezone**: Database connection time zone (default: None).
 
-You can override each of these values on a per-route basis: 
+You can override each of these values on a per-route basis:
 
-    @app.route('/cache/<item>', mysql={'dbname': 'xyz_db'})
-    def cache(item, db):
-        ...
-   
+```python
+@app.route('/cache/<item>', mysql={'dbname': 'xyz_db'})
+def cache(item, db):
+	...
+```
+
 or install two plugins with different ``keyword`` settings to the same application:
 
-    app = bottle.Bottle()
-    local_db = bottle_mysql.Plugin(dbuser='user', dbpass='pass', dbname='local_db')
-    prod_db = bottle_mysql.Plugin(dbuser='user', dbpass='pass', dbname='some_db', dbhost='sql.domain.tld', keyword='remote_db')
-    app.install(local_db)
-    app.install(prod_db)
+```python
+@app.route('/cache/<item>', mysql={'dbname': 'xyz_db'})
+app = bottle.Bottle()
+local_db = bottle_mysql.Plugin(dbuser='user', dbpass='pass', dbname='local_db')
+prod_db = bottle_mysql.Plugin(dbuser='user', dbpass='pass', dbname='some_db', dbhost='sql.domain.tld', keyword='remote_db')
+app.install(local_db)
+app.install(prod_db)
 
-    @app.route('/show/<item>')
-    def show(item, db):
-        ...
+@app.route('/show/<item>')
+def show(item, db):
+	...
 
-    @app.route('/cache/<item>')
-    def cache(item, remote_db):
-        ...
+@app.route('/cache/<item>')
+def cache(item, remote_db):
+	...
+```
