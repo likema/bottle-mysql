@@ -52,7 +52,7 @@ class MySQLPlugin(object):
 
     name = 'mysql'
 
-    def __init__(self, dbuser=None, dbpass=None, dbname=None, dbhost='localhost', dbport=3306, autocommit=True, dictrows=True, keyword='db', charset='utf8'):
+    def __init__(self, dbuser=None, dbpass=None, dbname=None, dbhost='localhost', dbport=3306, autocommit=True, dictrows=True, keyword='db', charset='utf8', timezone=None):
         self.dbhost = dbhost
         self.dbport = dbport
         self.dbuser = dbuser
@@ -62,6 +62,7 @@ class MySQLPlugin(object):
         self.dictrows = dictrows
         self.keyword = keyword
         self.charset = charset
+        self.timezone = timezone
 
     def setup(self, app):
         '''
@@ -85,6 +86,7 @@ class MySQLPlugin(object):
         dictrows = conf.get('dictrows', self.dictrows)
         keyword = conf.get('keyword', self.keyword)
         charset = conf.get('charset', self.charset)
+        timezone = conf.get('timezone', self.timezone)
 
         # Test if the original callback accepts a 'db' keyword.
         # Ignore it if it does not need a database handle.
@@ -102,6 +104,8 @@ class MySQLPlugin(object):
                 else:
                     con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname, charset=charset, port=dbport);
                 cur = con.cursor()
+                if timezone:
+                    cur.execute("set time_zone=%s", (timezone, ));
             except HTTPResponse, e:
                 raise HTTPError(500, "Database Error", e)
 
