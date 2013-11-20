@@ -1,0 +1,21 @@
+Source: python-bottle-mysql
+Section: universe/python
+Priority: optional
+Maintainer: Like Ma <likemartinma@gmail.com>
+Build-Depends: debhelper (>= 8.0.0)
+Build-Depends-Indep: python-all (>= 2.6.6-3~)
+Standards-Version: 3.9.2
+Homepage: https://github.com/likema/bottle-mysql
+X-Python-Version: >= 2.5
+Vcs-Git: git://github.com/likema/bottle-mysql.git
+Vcs-Browser: https://github.com/likema/bottle-mysql
+
+Package: python-bottle-mysql
+Architecture: all
+Depends: ${python:Depends}, ${misc:Depends}, python-mysqldb, python-bottle (>= 0.10)
+Provides: ${python:Provides}
+Description: MySQL integration for Bottle.
+ Bottle-MySQL is a plugin that integrates MySQL with your Bottle
+ application. It automatically connects to a database at the beginning of a
+ request, passes the database handle to the route callback and closes the
+ connection afterwards.
