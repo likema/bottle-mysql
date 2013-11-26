@@ -18,7 +18,7 @@ Usage Example::
 
     app = bottle.Bottle()
     # dbhost is optional, default is localhost
-    plugin = bottle_mysql.Plugin(dbuser='user', dbpass='pass', dbname='db')
+    plugin = bottle_mysql.Plugin(user='user', passwd='pass', db='db')
     app.install(plugin)
 
     @app.route('/show/:<tem>')
@@ -31,7 +31,7 @@ Usage Example::
 '''
 
 __author__ = "Michael Lustfield"
-__version__ = '0.1.1'
+__version__ = '0.1.5'
 __license__ = 'MIT'
 
 ### CUT HERE (see setup.py)
@@ -52,19 +52,13 @@ class MySQLPlugin(object):
 
     name = 'mysql'
 
-    def __init__(self, dbuser=None, dbpass=None, dbname=None,
-                 dbhost='localhost', dbport=3306, autocommit=True,
-                 dictrows=True, keyword='db', charset='utf8', timezone=None):
-        self.dbhost = dbhost
-        self.dbport = dbport
-        self.dbuser = dbuser
-        self.dbpass = dbpass
-        self.dbname = dbname
+    def __init__(self, autocommit=True, dictrows=True, keyword='db',
+                 timezone=None, **kwargs):
         self.autocommit = autocommit
         self.dictrows = dictrows
         self.keyword = keyword
-        self.charset = charset
         self.timezone = timezone
+        self._kwargs = kwargs
 
     def setup(self, app):
         '''
@@ -78,19 +72,48 @@ class MySQLPlugin(object):
                 raise PluginError("Found another mysql plugin with "
                                   "conflicting settings (non-unique keyword).")
 
+    def _pop(self, conf, name):
+        if name in conf:
+            val = conf[name]
+            del conf[name]
+        else:
+            val = getattr(self, name)
+
+        return val
+
+    def _assign(self, conf):
+        '''
+        Override global configuration with route-specific values.
+        '''
+        kwargs = dict(self._kwargs)
+
+        if conf:
+            conf = dict(conf)
+            autocommit = self._pop(conf, 'autocommit')
+            dictrows = self._pop(conf, 'dictrows')
+            keyword = self._pop(conf, 'keyword')
+            timezone = self._pop(conf, 'timezone')
+            kwargs.update(conf)
+        else:
+            autocommit = self.autocommit
+            dictrows = self.dictrows
+            keyword = self.keyword
+            timezone = self.timezone
+
+        # Using DictCursor lets us return result as a dictionary
+        # instead of the default list
+        if dictrows:
+            kwargs["cursorclass"] = cursors.DictCursor
+
+        if timezone and "init_command" not in kwargs:
+            kwargs["init_command"] = "set time_zone='%s'" % timezone
+            timezone = None
+
+        return autocommit, dictrows, keyword, timezone, kwargs
+
     def apply(self, callback, context):
-        # Override global configuration with route-specific values.
-        conf = context['config'].get('mysql', {})
-        dbhost = conf.get('dbhost', self.dbhost)
-        dbport = conf.get('dbport', self.dbport)
-        dbuser = conf.get('dbuser', self.dbuser)
-        dbpass = conf.get('dbpass', self.dbpass)
-        dbname = conf.get('dbname', self.dbname)
-        autocommit = conf.get('autocommit', self.autocommit)
-        dictrows = conf.get('dictrows', self.dictrows)
-        keyword = conf.get('keyword', self.keyword)
-        charset = conf.get('charset', self.charset)
-        timezone = conf.get('timezone', self.timezone)
+        autocommit, dictrows, keyword, timezone, kws = self._assign(
+            context['config'].get('mysql'))
 
         # Test if the original callback accepts a 'db' keyword.
         # Ignore it if it does not need a database handle.
@@ -99,22 +122,19 @@ class MySQLPlugin(object):
             return callback
 
         def wrapper(*args, **kwargs):
-            con, cur = self._connect(dbuser, dbpass, dbname, dbhost, dbport,
-                                     dictrows, charset, timezone)
-
             # Add the connection handle as a keyword argument.
-            kwargs[keyword] = cur
+            con, kwargs[keyword] = self._connect(timezone, **kws)
 
             try:
                 rv = callback(*args, **kwargs)
                 if autocommit:
                     con.commit()
-            except MySQLdb.IntegrityError, e:
+            except MySQLdb.IntegrityError as e:
                 con.rollback()
                 raise HTTPError(500, "Database Error", e)
-            except HTTPError, e:
+            except HTTPError as e:
                 raise
-            except HTTPResponse, e:
+            except HTTPResponse:
                 if autocommit:
                     con.commit()
                 raise
@@ -127,25 +147,17 @@ class MySQLPlugin(object):
         return wrapper
 
     @staticmethod
-    def _connect(dbuser, dbpass, dbname, dbhost, dbport,
-                 dictrows, charset, timezone):
+    def _connect(timezone, **kwargs):
         try:
-            # Using DictCursor lets us return result as a dictionary
-            # instead of the default list
-            if dictrows:
-                con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname,
-                                      cursorclass=cursors.DictCursor,
-                                      charset=charset, port=dbport)
-            else:
-                con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname,
-                                      charset=charset, port=dbport)
+            con = MySQLdb.connect(**kwargs)
             cur = con.cursor()
             if timezone:
                 cur.execute("set time_zone=%s", (timezone, ))
-        except HTTPResponse, e:
+        except HTTPResponse as e:
             raise HTTPError(500, "Database Error", e)
 
         return con, cur
+
 
 Plugin = MySQLPlugin
 
