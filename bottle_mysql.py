@@ -39,7 +39,7 @@ __license__ = 'MIT'
 import inspect
 import MySQLdb
 import MySQLdb.cursors as cursors
-from bottle import HTTPResponse, HTTPError
+from bottle import HTTPResponse, HTTPError, PluginError
 
 
 class MySQLPlugin(object):
@@ -52,7 +52,9 @@ class MySQLPlugin(object):
 
     name = 'mysql'
 
-    def __init__(self, dbuser=None, dbpass=None, dbname=None, dbhost='localhost', dbport=3306, autocommit=True, dictrows=True, keyword='db', charset='utf8', timezone=None):
+    def __init__(self, dbuser=None, dbpass=None, dbname=None,
+                 dbhost='localhost', dbport=3306, autocommit=True,
+                 dictrows=True, keyword='db', charset='utf8', timezone=None):
         self.dbhost = dbhost
         self.dbport = dbport
         self.dbuser = dbuser
@@ -66,17 +68,19 @@ class MySQLPlugin(object):
 
     def setup(self, app):
         '''
-        Make sure that other installed plugins don't affect the same keyword argument.
+        Make sure that other installed plugins don't affect the same keyword
+        argument.
         '''
         for other in app.plugins:
             if not isinstance(other, MySQLPlugin):
                 continue
             if other.keyword == self.keyword:
-                raise PluginError("Found another mysql plugin with conflicting settings (non-unique keyword).")
+                raise PluginError("Found another mysql plugin with "
+                                  "conflicting settings (non-unique keyword).")
 
     def apply(self, callback, context):
         # Override global configuration with route-specific values.
-        conf = context['config'].get('mysql') or {}
+        conf = context['config'].get('mysql', {})
         dbhost = conf.get('dbhost', self.dbhost)
         dbport = conf.get('dbport', self.dbport)
         dbuser = conf.get('dbuser', self.dbuser)
@@ -95,19 +99,8 @@ class MySQLPlugin(object):
             return callback
 
         def wrapper(*args, **kwargs):
-            # Connect to the database
-            con = None
-            try:
-                # Using DictCursor lets us return result as a dictionary instead of the default list
-                if dictrows:
-                    con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname, cursorclass=cursors.DictCursor, charset=charset, port=dbport);
-                else:
-                    con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname, charset=charset, port=dbport);
-                cur = con.cursor()
-                if timezone:
-                    cur.execute("set time_zone=%s", (timezone, ));
-            except HTTPResponse, e:
-                raise HTTPError(500, "Database Error", e)
+            con, cur = self._connect(dbuser, dbpass, dbname, dbhost, dbport,
+                                     dictrows, charset, timezone)
 
             # Add the connection handle as a keyword argument.
             kwargs[keyword] = cur
@@ -133,4 +126,27 @@ class MySQLPlugin(object):
         # Replace the route callback with the wrapped one.
         return wrapper
 
+    @staticmethod
+    def _connect(dbuser, dbpass, dbname, dbhost, dbport,
+                 dictrows, charset, timezone):
+        try:
+            # Using DictCursor lets us return result as a dictionary
+            # instead of the default list
+            if dictrows:
+                con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname,
+                                      cursorclass=cursors.DictCursor,
+                                      charset=charset, port=dbport)
+            else:
+                con = MySQLdb.connect(dbhost, dbuser, dbpass, dbname,
+                                      charset=charset, port=dbport)
+            cur = con.cursor()
+            if timezone:
+                cur.execute("set time_zone=%s", (timezone, ))
+        except HTTPResponse, e:
+            raise HTTPError(500, "Database Error", e)
+
+        return con, cur
+
 Plugin = MySQLPlugin
+
+# vim: ts=4 sw=4 sts=4 et:
